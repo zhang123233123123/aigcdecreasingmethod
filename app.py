@@ -76,45 +76,34 @@ st.markdown("基于 **DeepSeek AI** 分析文本的 **AIGC生成概率**，自�
 def analyze_text_with_deepseek(text, api_key):
     """使用DeepSeek API分析文本的AI生成概率并提供优化建议"""
     try:
-        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        # 修复proxies参数问题
+        client = OpenAI(
+            api_key=api_key, 
+            base_url="https://api.deepseek.com"
+        )
         
         # 根据AI检测原理优化提示词
         messages = [
             {"role": "system", "content": """
-            你是一个专业的文本优化助手，请对以下文本进行分析并完成两项任务：
+            你是一个专业的文本优化助手，请对以下文本进行分析并完成优化任务：
             
-            1. 分析该文本由AI生成的概率（以百分比表示），基于以下三大核心技术的检测原理：
-               - 语言模型分析：评估文本与大型语言模型生成内容的"指纹"相似度
-               - 文本特征提取：分析语言多样性、句长变化、词汇丰富度（AI文本往往过于规律化）
-               - 语篇连贯性分析：检测是否过于条理化、缺乏人类写作中常见的思维跳跃和逻辑断层
+            请根据以下三大核心技术的检测原理进行优化：
+            - 语言模型分析：评估文本与大型语言模型生成内容的"指纹"相似度
+            - 文本特征提取：分析语言多样性、句长变化、词汇丰富度（AI文本往往过于规律化）
+            - 语篇连贯性分析：检测是否过于条理化、缺乏人类写作中常见的思维跳跃和逻辑断层
             
-            2. 根据AI概率，提供优化建议使其更像人类所写：
-               - 如果AI概率>70%（深度改写）：
-                 * 打破过于规整的段落结构，增加句长变化
-                 * 增加个性化表达和口语化元素
-                 * 适当加入转折、跳跃或小偏题，模拟人类思维流动
-                 * 使用更多人类常用但非最优的词汇选择
-                 * 偶尔使用不那么严密的逻辑关系
-                 * 请保持严谨的语言以符合论文的要求
-               
-               - 如果AI概率在60%-70%（适度优化）：
-                 * 调整部分句式和衔接方式
-                 * 增加适量的主观表达和个人感受
-                 * 减少过于完美的段落结构
-                 * 请保持严谨的语言以符合论文的要求
-               
-               - 如果AI概率在50%-60%（轻微调整）：
-                 * 微调词汇选择，避免过于正式的学术感
-                 * 调整极少数过于机械的表达方式
-                 * 请保持严谨的语言以符合论文的要求
-               
-               - 如果AI概率<50%：
-                 * 完全保留原文，无需修改
+            优化建议：
+            - 打破过于规整的段落结构，增加句长变化
+            - 增加个性化表达和口语化元素
+            - 适当加入转折、跳跃或小偏题，模拟人类思维流动
+            - 使用更多人类常用但非最优的词汇选择
+            - 偶尔使用不那么严密的逻辑关系
+            - 增加适量的主观表达和个人感受
+            - 减少过于完美的段落结构
             
             请确保修改后的文本保持原意，但更具人类写作特色。
             
-            请按以下格式回复：
-            {"ai_probability": 数字, "optimized_text": "优化后的文本"}
+            请直接返回优化后的文本，不要包含其他解释或分析。
             """},
             {"role": "user", "content": text}
         ]
@@ -125,30 +114,12 @@ def analyze_text_with_deepseek(text, api_key):
             stream=False
         )
         
-        response_text = response.choices[0].message.content
-        
-        # 提取JSON格式的响应
-        json_pattern = r'\{.*\}'
-        json_match = re.search(json_pattern, response_text, re.DOTALL)
-        
-        if json_match:
-            result = json.loads(json_match.group())
-            return result.get("ai_probability", 0), result.get("optimized_text", text)
-        else:
-            # 如果无法解析JSON，从文本中尝试提取概率
-            prob_pattern = r'ai_probability":\s*(\d+)'
-            prob_match = re.search(prob_pattern, response_text)
-            prob = int(prob_match.group(1)) if prob_match else 50
-            
-            # 提取优化文本
-            opt_pattern = r'optimized_text":\s*"([^"]+)'
-            opt_match = re.search(opt_pattern, response_text)
-            opt_text = opt_match.group(1) if opt_match else text
-            
-            return prob, opt_text
+        # 直接返回优化后的文本，AI概率将由用户手动选择
+        optimized_text = response.choices[0].message.content
+        return optimized_text
     except Exception as e:
         st.error(f"调用DeepSeek API时发生错误: {str(e)}")
-        return 50, text  # 返回默认值
+        return text  # 出错时返回原文本
 
 # 处理Word文档上传
 def process_docx_upload(uploaded_file):
@@ -378,6 +349,23 @@ with col1:
         prob = st.session_state.ai_probabilities[selected_para_index]
         color_class = get_color_class(prob)
         
+        # 手动选择AI生成概率
+        st.markdown("### 手动设置AI生成概率")
+        selected_prob = st.slider(
+            "AI生成概率", 
+            min_value=0, 
+            max_value=100, 
+            value=prob,
+            step=5,
+            help="手动设置文本的AI生成概率，用于决定改写程度"
+        )
+        
+        # 更新AI生成概率
+        if selected_prob != prob:
+            st.session_state.ai_probabilities[selected_para_index] = selected_prob
+            prob = selected_prob
+            color_class = get_color_class(prob)
+        
         st.markdown(f"<p>AI生成概率: <span class='{color_class}'>{prob}%</span></p>", unsafe_allow_html=True)
         
         # 编辑区域
@@ -391,33 +379,24 @@ with col1:
         if st.session_state.selected_text != st.session_state.modified_paragraphs[selected_para_index]:
             st.session_state.modified_paragraphs[selected_para_index] = st.session_state.selected_text
         
-        # AI分析按钮
-        if st.button("使用DeepSeek AI分析和优化此段落"):
+        # AI优化按钮
+        if st.button("使用DeepSeek AI优化此段落"):
             if not st.session_state.api_key:
                 st.error("请输入DeepSeek API密钥")
             else:
-                with st.spinner("正在分析文本..."):
+                with st.spinner("正在优化文本..."):
                     text = st.session_state.selected_text
-                    ai_prob, optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key)
+                    optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key)
                     
-                    st.session_state.ai_probabilities[selected_para_index] = ai_prob
-                    
-                    # 显示AI分析结果
-                    st.markdown(f"### AI分析结果")
-                    st.markdown(f"<p>AI生成概率: <span class='{get_color_class(ai_prob)}'>{ai_prob}%</span></p>", 
+                    # 显示优化结果
+                    st.markdown("### 优化结果")
+                    st.markdown(f"<p class='color-green'>{optimized_text}</p>", 
                                 unsafe_allow_html=True)
                     
-                    if ai_prob > 50:
-                        st.markdown("### 优化建议")
-                        st.markdown(f"<p class='color-green'>{optimized_text}</p>", 
-                                    unsafe_allow_html=True)
-                        
-                        if st.button("应用AI优化建议"):
-                            st.session_state.modified_paragraphs[selected_para_index] = optimized_text
-                            st.session_state.selected_text = optimized_text
-                            st.experimental_rerun()
-                    else:
-                        st.success("此段落的AI生成概率较低，无需修改。")
+                    if st.button("应用AI优化建议"):
+                        st.session_state.modified_paragraphs[selected_para_index] = optimized_text
+                        st.session_state.selected_text = optimized_text
+                        st.experimental_rerun()
 
 # 右侧面板 - 修改前后对比
 with col2:
@@ -475,11 +454,10 @@ with col2:
                 progress_bar = stqdm(st.session_state.paragraphs)
                 for idx, para in enumerate(progress_bar):
                     progress_bar.set_description(f"正在分析段落 {idx+1}/{len(st.session_state.paragraphs)}")
-                    ai_prob, optimized_text = analyze_text_with_deepseek(para, st.session_state.api_key)
-                    st.session_state.ai_probabilities[idx] = ai_prob
+                    optimized_text = analyze_text_with_deepseek(para, st.session_state.api_key)
                     
-                    # 根据AI概率决定是否修改
-                    if ai_prob > 50:
+                    # 根据当前设置的AI概率决定是否修改
+                    if st.session_state.ai_probabilities[idx] > 50:
                         st.session_state.modified_paragraphs[idx] = optimized_text
                 
                 st.success("批量分析完成!")
