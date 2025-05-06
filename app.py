@@ -74,8 +74,8 @@ st.title("AIGC 文本降重修改工具")
 st.markdown("基于 **DeepSeek AI** 分析文本的 **AIGC生成概率**，自动优化内容，降低AI检测风险")
 
 # DeepSeek API 调用函数
-def analyze_text_with_deepseek(text, api_key):
-    """使用DeepSeek API分析文本的AI生成概率并提供优化建议"""
+def analyze_text_with_deepseek(text, api_key, ai_probability=50):
+    """使用DeepSeek API分析文本的AI生成概率并提供优化建议，传入用户选择的AI率"""
     try:
         # 直接使用requests库调用API而不是OpenAI客户端
         headers = {
@@ -83,45 +83,65 @@ def analyze_text_with_deepseek(text, api_key):
             "Content-Type": "application/json"
         }
         
+        # 根据用户选择的AI率构建不同的提示词
+        system_prompt = f"""
+        你是一个专业的文本优化助手，请对以下文本进行分析并基于{ai_probability}%的AI率进行优化：
+
+        请基于以下三大核心检测原理进行针对性处理：
+        - 语言特征分析：文本与AI生成内容的"指纹"相似度评估
+        - 表达多样性：句长变化、词汇丰富度和表达方式（避免过于规整）
+        - 思维流动性：有意识地融入人类写作中常见的思维跳跃和小缺陷
+
+        根据文本的AI概率{ai_probability}%，请采用以下优化策略：
+        """
+        
+        # 根据不同AI率范围添加具体优化策略
+        if ai_probability > 70:
+            system_prompt += """
+            【深度优化】需要进行的改变：
+              * 彻底打破句式结构规律性，引入自然起伏的句长变化
+              * 加入口语化但学术上可接受的表述（"其实"、"说实话"、"值得一提的是"等）
+              * 适度引入转折（"不过"、"然而"、"但话说回来"）和小范围跳跃性思考
+              * 以个人视角重构部分论述（"我认为"、"从这个角度看"）
+              * 保持原意的前提下，用不那么"完美"的解释替换过于教科书式的表述
+            """
+        elif 60 <= ai_probability <= 70:
+            system_prompt += """
+            【适度调整】需要进行的改变：
+              * 保留部分原始结构，但有针对性地调整过于规则的段落
+              * 增加少量个人见解和口语化连接词，但不影响学术严谨性
+              * 在保持主要论点的同时，稍微调整论证路径，使其更自然
+            """
+        elif 50 <= ai_probability < 60:
+            system_prompt += """
+            【轻微优化】需要进行的改变：
+              * 主要保留原文，只对最明显的AI特征进行微调
+              * 替换1-2个过于标准化的表达，增加人性化语气
+              * 微调个别句子的结构，但整体保持原貌
+            """
+        else:
+            system_prompt += """
+            【保持原文】AI概率低于50%：
+              * 文本已经具有较好的人类写作特征
+              * 无需大量修改，可以保持原貌
+              * 如有需要，只对个别明显机器化的表达进行调整
+            """
+        
+        # 添加通用要求
+        system_prompt += """
+        所有优化均应：
+        - 保持学术写作基本规范和专业性
+        - 确保术语使用的准确性不变
+        - 在引入口语化元素的同时不失专业严谨
+        - 避免过度调整导致内容失真
+
+        请直接输出优化后的文本，不要解释你的修改。
+        """
+        
         payload = {
             "model": "deepseek-chat",
             "messages": [
-                {"role": "system", "content": """
-                你是一个专业的文本优化助手，请对以下文本进行分析并根据AI概率分级优化：
-
-请基于以下三大核心检测原理进行针对性处理：
-- 语言特征分析：文本与AI生成内容的"指纹"相似度评估
-- 表达多样性：句长变化、词汇丰富度和表达方式（避免过于规整）
-- 思维流动性：有意识地融入人类写作中常见的思维跳跃和小缺陷
-
-根据文本的AI概率，请采用以下优化策略：
-【高AI概率区间 >70%】 深度优化：
-  * 彻底打破句式结构规律性，引入自然起伏的句长变化
-  * 加入口语化但学术上可接受的表述（"其实"、"说实话"、"值得一提的是"等）
-  * 适度引入转折（"不过"、"然而"、"但话说回来"）和小范围跳跃性思考
-  * 以个人视角重构部分论述（"我认为"、"从这个角度看"）
-  * 保持原意的前提下，用不那么"完美"的解释替换过于教科书式的表述
-  *不能影响学术严谨性
-
-【中AI概率区间 60%-70%】 适度调整：
-  * 保留部分原始结构，但有针对性地调整过于规则的段落
-  * 增加少量个人见解和口语化连接词，但不影响学术严谨性
-  * 在保持主要论点的同时，稍微调整论证路径，使其更自然
-
-【低AI概率区间 <60%】 轻微优化：
-  * 主要保留原文，只对最明显的AI特征进行微调
-  * 替换1-2个过于标准化的表达，增加人性化语气
-  * 微调个别句子的结构，但整体保持原貌
-  *不能影响学术严谨性
-
-所有优化均应：
-- 保持学术写作基本规范和专业性
-- 确保术语使用的准确性不变
-- 在引入口语化元素的同时不失专业严谨
-- 避免过度调整导致内容失真
-
-请直接输出优化后的文本，不要解释你的修改。
-                """},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
             ]
         }
@@ -410,7 +430,9 @@ with col1:
             else:
                 with st.spinner("正在优化文本..."):
                     text = st.session_state.selected_text
-                    optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key)
+                    # 将用户选择的AI概率值传递给API调用函数
+                    ai_prob = st.session_state.ai_probabilities[selected_para_index]
+                    optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key, ai_prob)
                     
                     # 显示优化结果
                     st.markdown("### 优化结果")
@@ -475,13 +497,15 @@ with col2:
             if not st.session_state.api_key:
                 st.error("请输入DeepSeek API密钥")
             else:
-                progress_bar = stqdm(st.session_state.paragraphs)
-                for idx, para in enumerate(progress_bar):
+                progress_bar = stqdm(enumerate(st.session_state.paragraphs))
+                for idx, para in progress_bar:
                     progress_bar.set_description(f"正在分析段落 {idx+1}/{len(st.session_state.paragraphs)}")
-                    optimized_text = analyze_text_with_deepseek(para, st.session_state.api_key)
+                    # 将每个段落的AI概率值传递给API调用函数
+                    ai_prob = st.session_state.ai_probabilities[idx]
+                    optimized_text = analyze_text_with_deepseek(para, st.session_state.api_key, ai_prob)
                     
                     # 根据当前设置的AI概率决定是否修改
-                    if st.session_state.ai_probabilities[idx] > 50:
+                    if ai_prob > 50:
                         st.session_state.modified_paragraphs[idx] = optimized_text
                 
                 st.success("批量分析完成!")
