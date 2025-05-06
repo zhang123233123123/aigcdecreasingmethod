@@ -3,9 +3,10 @@ import io
 import tempfile
 import os
 from docx import Document
-from docx.shared import RGBColor
 from openai import OpenAI
 import base64
+import re
+import json
 from stqdm import stqdm
 
 # 页面配置
@@ -124,8 +125,6 @@ def analyze_text_with_deepseek(text, api_key):
         response_text = response.choices[0].message.content
         
         # 提取JSON格式的响应
-        import re
-        import json
         json_pattern = r'\{.*\}'
         json_match = re.search(json_pattern, response_text, re.DOTALL)
         
@@ -181,10 +180,17 @@ def process_docx_upload(uploaded_file):
                     # 处理字体颜色
                     has_color = False
                     color_rgb = None
-                    if run.font.color and run.font.color.rgb:
-                        has_color = True
-                        # 将RGBColor对象的rgb属性转换为整数
-                        color_rgb = run.font.color.rgb
+                    
+                    # 安全地获取颜色信息
+                    if hasattr(run, 'font') and hasattr(run.font, 'color'):
+                        try:
+                            font_color = run.font.color
+                            if font_color and hasattr(font_color, 'rgb') and font_color.rgb:
+                                has_color = True
+                                # 获取颜色值，可能是整数或其他类型
+                                color_rgb = font_color.rgb
+                        except:
+                            pass
                     
                     run_style = {
                         'text': run.text,
@@ -261,24 +267,22 @@ def get_paragraph_style_html(para_idx):
         # 使用原始文本颜色，如果有
         if first_run['has_color'] and first_run['color_rgb']:
             try:
-                # 检查color_rgb的类型并正确处理
+                # 简化颜色处理逻辑
                 rgb = first_run['color_rgb']
-                if hasattr(rgb, 'rgb'):
-                    # 如果是RGBColor对象，直接使用其rgb属性
-                    color_value = rgb.rgb
+                if isinstance(rgb, int):
+                    # 如果是整数值，直接处理
+                    r = rgb & 0xFF
+                    g = (rgb >> 8) & 0xFF
+                    b = (rgb >> 16) & 0xFF
+                    style_str += f"color: rgb({r}, {g}, {b}); "
+                elif hasattr(rgb, '_rgb'):
+                    # 处理某些颜色对象
+                    color_value = rgb._rgb
                     if color_value is not None:
-                        r = color_value & 0xFF
-                        g = (color_value >> 8) & 0xFF
-                        b = (color_value >> 16) & 0xFF
-                        style_str += f"color: rgb({r}, {g}, {b}); "
+                        style_str += f"color: #{color_value:06x}; "
                 else:
-                    # 如果已经是整数值，直接使用
-                    color_value = rgb
-                    if color_value is not None:
-                        r = color_value & 0xFF
-                        g = (color_value >> 8) & 0xFF
-                        b = (color_value >> 16) & 0xFF
-                        style_str += f"color: rgb({r}, {g}, {b}); "
+                    # 默认使用黑色
+                    style_str += "color: black; "
             except Exception as e:
                 # 如果解析颜色出错，使用默认黑色
                 style_str += "color: black; "
@@ -307,36 +311,11 @@ def export_modified_doc():
                 
                 # 应用原段落的样式
                 new_para.style = para.style
-                new_para.alignment = para.alignment
                 
                 # 判断是否有保存的样式信息
                 if hasattr(st.session_state, 'paragraph_styles') and para_idx < len(st.session_state.paragraph_styles):
-                    # 获取保存的样式信息
-                    para_style = st.session_state.paragraph_styles[para_idx]
-                    
-                    # 判断段落是否有多个格式run
-                    if len(para_style['runs']) > 0:
-                        # 文本可能已被修改，无法精确匹配原来的runs
-                        # 我们使用修改后的文本，但尽量保留原来的格式属性
-                        run = new_para.add_run(modified_paragraphs[para_idx])
-                        
-                        # 应用第一个run的格式作为默认格式
-                        first_run_style = para_style['runs'][0]
-                        if first_run_style['bold'] is not None:
-                            run.bold = first_run_style['bold']
-                        if first_run_style['italic'] is not None:
-                            run.italic = first_run_style['italic']
-                        if first_run_style['underline'] is not None:
-                            run.underline = first_run_style['underline']
-                        if first_run_style['font_size'] is not None:
-                            run.font.size = first_run_style['font_size']
-                        if first_run_style['font_name'] is not None:
-                            run.font.name = first_run_style['font_name']
-                        if first_run_style['has_color'] and first_run_style['color_rgb']:
-                            run.font.color.rgb = first_run_style['color_rgb']
-                    else:
-                        # 如果没有保存任何run格式，直接添加文本
-                        new_para.add_run(modified_paragraphs[para_idx])
+                    # 添加修改后的文本内容（不处理复杂格式，只添加纯文本）
+                    new_para.add_run(modified_paragraphs[para_idx])
                 else:
                     # 没有保存的样式信息，直接添加文本
                     new_para.add_run(modified_paragraphs[para_idx])
