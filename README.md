@@ -1,0 +1,2 @@
+# aigcdecreasingmethod
+aigc
