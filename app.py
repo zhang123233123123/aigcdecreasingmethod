@@ -8,6 +8,7 @@ import base64
 import re
 import json
 from stqdm import stqdm
+import requests
 
 # 页面配置
 st.set_page_config(
@@ -76,47 +77,55 @@ st.markdown("基于 **DeepSeek AI** 分析文本的 **AIGC生成概率**，自�
 def analyze_text_with_deepseek(text, api_key):
     """使用DeepSeek API分析文本的AI生成概率并提供优化建议"""
     try:
-        # 修复proxies参数问题
-        client = OpenAI(
-            api_key=api_key, 
-            base_url="https://api.deepseek.com"
+        # 直接使用requests库调用API而不是OpenAI客户端
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": """
+                你是一个专业的文本优化助手，请对以下文本进行分析并完成优化任务：
+                
+                请根据以下三大核心技术的检测原理进行优化：
+                - 语言模型分析：评估文本与大型语言模型生成内容的"指纹"相似度
+                - 文本特征提取：分析语言多样性、句长变化、词汇丰富度（AI文本往往过于规律化）
+                - 语篇连贯性分析：检测是否过于条理化、缺乏人类写作中常见的思维跳跃和逻辑断层
+                
+                优化建议：
+                - 打破过于规整的段落结构，增加句长变化
+                - 增加个性化表达和口语化元素
+                - 适当加入转折、跳跃或小偏题，模拟人类思维流动
+                - 使用更多人类常用但非最优的词汇选择
+                - 偶尔使用不那么严密的逻辑关系
+                - 增加适量的主观表达和个人感受
+                - 减少过于完美的段落结构
+                
+                请确保修改后的文本保持原意，但更具人类写作特色。
+                
+                请直接返回优化后的文本，不要包含其他解释或分析。
+                """},
+                {"role": "user", "content": text}
+            ]
+        }
+        
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=payload
         )
         
-        # 根据AI检测原理优化提示词
-        messages = [
-            {"role": "system", "content": """
-            你是一个专业的文本优化助手，请对以下文本进行分析并完成优化任务：
+        # 检查响应状态
+        if response.status_code == 200:
+            response_data = response.json()
+            optimized_text = response_data["choices"][0]["message"]["content"]
+            return optimized_text
+        else:
+            st.error(f"API调用失败，状态码: {response.status_code}, 响应: {response.text}")
+            return text
             
-            请根据以下三大核心技术的检测原理进行优化：
-            - 语言模型分析：评估文本与大型语言模型生成内容的"指纹"相似度
-            - 文本特征提取：分析语言多样性、句长变化、词汇丰富度（AI文本往往过于规律化）
-            - 语篇连贯性分析：检测是否过于条理化、缺乏人类写作中常见的思维跳跃和逻辑断层
-            
-            优化建议：
-            - 打破过于规整的段落结构，增加句长变化
-            - 增加个性化表达和口语化元素
-            - 适当加入转折、跳跃或小偏题，模拟人类思维流动
-            - 使用更多人类常用但非最优的词汇选择
-            - 偶尔使用不那么严密的逻辑关系
-            - 增加适量的主观表达和个人感受
-            - 减少过于完美的段落结构
-            
-            请确保修改后的文本保持原意，但更具人类写作特色。
-            
-            请直接返回优化后的文本，不要包含其他解释或分析。
-            """},
-            {"role": "user", "content": text}
-        ]
-        
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=messages,
-            stream=False
-        )
-        
-        # 直接返回优化后的文本，AI概率将由用户手动选择
-        optimized_text = response.choices[0].message.content
-        return optimized_text
     except Exception as e:
         st.error(f"调用DeepSeek API时发生错误: {str(e)}")
         return text  # 出错时返回原文本
