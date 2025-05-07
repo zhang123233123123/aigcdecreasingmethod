@@ -394,7 +394,7 @@ with col1:
         color_class = get_color_class(prob)
         
         # 手动选择AI生成概率
-        st.markdown("### 手动设置AI生成概率")
+        st.markdown("### 手动设置AI生成概率（AI率越高改写程度越大，本AI率是指原文本的AI率")
         selected_prob = st.slider(
             "AI生成概率", 
             min_value=0, 
