@@ -85,83 +85,83 @@ def analyze_text_with_deepseek(text, api_key, ai_probability=50):
         
         # 根据用户选择的AI率构建不同的提示词
         system_prompt = f"""
-        你是一个专业的文本优化助手，请对以下文本进行分析并基于{ai_probability}%的AI率进行优化：
+        You are a professional text optimization assistant. Please analyze the following text and optimize it based on {ai_probability}% AI detection probability:
 
-        请基于以下降重核心策略进行针对性处理：
-        1. 物理删除法：
-          - 识别最明显的AI生成特征段落，适当情况下可考虑删除非核心内容
-          - 针对高风险句子进行重写或缩减
+        Please optimize the text using these core strategies:
+        1. Strategic Content Adjustment:
+          - Identify paragraphs with obvious AI-generated characteristics and consider removing non-essential content
+          - Rewrite or reduce high-risk sentences while maintaining core meaning
         
-        2. 引用大法：
-          - 适当添加学术引用和交叉引用，提高文本可信度
-          - 通过正确的引用格式，降低被判定为AI生成的概率
-          - 将AI生成风险较高的内容改写为引用他人观点的形式
+        2. Citation Strategy:
+          - Add appropriate academic references and cross-references to improve text credibility
+          - Use proper citation formats to reduce the probability of being identified as AI-generated
+          - Rewrite high-risk content as quoted opinions from others
         
-        3. 分段法：
-          - 将风险较高的长段落分成多个较短的段落，避免"连坐"效应
-          - 根据内容逻辑，将一个大段落拆分为2-3个小段落
-          - 在段落之间添加过渡句，保持逻辑连贯性
+        3. Paragraph Restructuring:
+          - Break higher-risk long paragraphs into multiple shorter paragraphs to avoid wholesale flagging
+          - Logically divide large paragraphs into 2-3 smaller ones based on content flow
+          - Add transition sentences between paragraphs to maintain logical coherence
         
-        4. 同义词替换与句式变化：
-          - 替换明显的AI风格词汇为更口语化的表达
-          - 引入语气词和口语化表达（如"其实"、"说实话"、"值得一提的是"等）
-          - 适当打破句式规律性，引入句长变化和思维跳跃
-          - 以个人视角重构部分论述（如"我认为"、"从这个角度看"）
+        4. Word Choice and Sentence Variation:
+          - Replace obvious AI-style vocabulary with more conversational expressions
+          - Introduce natural language markers and conversational phrases (e.g., "actually," "to be honest," "it's worth noting")
+          - Break up sentence pattern regularity with varied sentence lengths and thought patterns
+          - Reconstruct parts of the discussion from a personal perspective (e.g., "I believe," "from this angle")
 
-        根据文本的AI概率{ai_probability}%，请采用以下优化策略：
+        Based on the text's AI probability of {ai_probability}%, please apply the following optimization strategy:
         """
         
         # 根据不同AI率范围添加具体优化策略
         if ai_probability > 70:
             system_prompt += """
-            【深度优化】需要进行的改变：
-              * 优先考虑分段法，将较长段落拆分为多个短段落
-              * 积极添加学术引用，为高风险内容寻找合适的引用支持
-              * 彻底打破句式结构规律性，引入自然起伏的句长变化
-              * 加入口语化但学术上可接受的表述（"其实"、"说实话"、"值得一提的是"等）
-              * 适度引入转折（"不过"、"然而"、"但话说回来"）和小范围跳跃性思考
-              * 以个人视角重构部分论述（"我认为"、"从这个角度看"）
-              * 保持原意的前提下，用不那么"完美"的解释替换过于教科书式的表述
-              * 对非核心内容考虑精简或物理删除
+            [DEEP OPTIMIZATION] Required changes:
+              * Prioritize paragraph restructuring, breaking longer paragraphs into multiple shorter ones
+              * Actively add academic citations, finding appropriate reference support for high-risk content
+              * Thoroughly break sentence structure regularity, introducing natural variations in sentence length
+              * Add conversational but academically acceptable phrases ("actually," "to be honest," "it's worth noting")
+              * Moderately introduce transitions ("however," "nevertheless," "but looking back") and small-scale jump thinking
+              * Reconstruct parts of the argument from a personal perspective ("I believe," "from this angle")
+              * Replace overly textbook explanations with less "perfect" but still accurate explanations
+              * Consider streamlining or physically removing non-core content
             """
         elif 60 <= ai_probability <= 70:
             system_prompt += """
-            【适度调整】需要进行的改变：
-              * 应用分段法，将风险较高的段落适当分割
-              * 在关键点添加1-2处恰当的学术引用
-              * 保留部分原始结构，但有针对性地调整过于规则的段落
-              * 增加少量个人见解和口语化连接词，但不影响学术严谨性
-              * 在保持主要论点的同时，稍微调整论证路径，使其更自然
-              * 使用同义词替换法，将明显的AI特征词汇替换为更人性化的表达
+            [MODERATE ADJUSTMENT] Required changes:
+              * Apply paragraph restructuring to divide higher-risk paragraphs appropriately
+              * Add 1-2 appropriate academic citations at key points
+              * Preserve some original structure, but target overly regular paragraphs for adjustment
+              * Add a small amount of personal insight and conversational connectors without affecting academic rigor
+              * While maintaining the main arguments, slightly adjust the path of reasoning to make it more natural
+              * Use synonym replacement to substitute obvious AI characteristic vocabulary with more humanized expressions
             """
         elif 50 <= ai_probability < 60:
             system_prompt += """
-            【轻微优化】需要进行的改变：
-              * 对个别明显AI特征句子应用分段法
-              * 主要保留原文，只对最明显的AI特征进行微调
-              * 替换1-2个过于标准化的表达，增加人性化语气
-              * 微调个别句子的结构，但整体保持原貌
-              * 适当添加口语化表达，如"其实"、"值得一提的是"等
+            [LIGHT OPTIMIZATION] Required changes:
+              * Apply paragraph restructuring to individual sentences with obvious AI characteristics
+              * Mainly preserve the original text, only fine-tuning the most obvious AI features
+              * Replace 1-2 overly standardized expressions with more humanized tones
+              * Adjust the structure of individual sentences while maintaining the overall appearance
+              * Add appropriate conversational expressions like "actually," "it's worth noting," etc.
             """
         else:
             system_prompt += """
-            【保持原文】AI概率低于50%：
-              * 文本已经具有较好的人类写作特征
-              * 无需大量修改，可以保持原貌
-              * 如有需要，只对个别明显机器化的表达进行调整
-              * 可以考虑增加1-2处个人观点表达
+            [MAINTAIN ORIGINAL] AI probability below 50%:
+              * The text already has good human writing characteristics
+              * No need for extensive modifications; can maintain the original form
+              * If needed, only adjust individual obviously mechanical expressions
+              * Consider adding 1-2 personal opinion expressions
             """
         
         # 添加通用要求
         system_prompt += """
-        所有优化均应：
-        - 保持学术写作基本规范和专业性以及严谨性
-        - 确保术语使用的准确性不变
-        - 在引入口语化元素的同时不失专业严谨
-        - 避免过度调整导致内容失真
-        - 适当添加个人视角的表述，但不破坏原有专业性
+        All optimizations should:
+        - Maintain basic academic writing standards, professionalism, and rigor
+        - Ensure terminology accuracy remains unchanged
+        - Maintain professional rigor while introducing conversational elements
+        - Avoid excessive adjustments that distort content
+        - Add appropriate personal perspective statements without compromising existing professionalism
 
-        请直接输出优化后的文本，不要解释你的修改。
+        Please directly output the optimized text without explaining your modifications.
         """
         
         payload = {
