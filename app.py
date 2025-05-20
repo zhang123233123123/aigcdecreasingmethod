@@ -18,16 +18,10 @@ st.set_page_config(
 )
 
 # 初始化会话状态
-if 'doc' not in st.session_state:
-    st.session_state.doc = None
-if 'paragraphs' not in st.session_state:
-    st.session_state.paragraphs = []
-if 'modified_paragraphs' not in st.session_state:
-    st.session_state.modified_paragraphs = []
-if 'ai_probabilities' not in st.session_state:
-    st.session_state.ai_probabilities = []
-if 'selected_text' not in st.session_state:
-    st.session_state.selected_text = ""
+if 'input_text' not in st.session_state:
+    st.session_state.input_text = ""
+if 'output_text' not in st.session_state:
+    st.session_state.output_text = ""
 if 'api_key' not in st.session_state:
     st.session_state.api_key = ""
 
@@ -56,14 +50,16 @@ st.markdown("""
         display: flex;
         gap: 10px;
         margin: 10px 0;
+        justify-content: center;
     }
     .reset-button {
-        background-color: #f0f2f6;
+        background-color: white;
         color: black;
-        border: none;
+        border: 1px solid #ddd;
         padding: 10px 20px;
         border-radius: 5px;
         cursor: pointer;
+        min-width: 100px;
     }
     .generate-button {
         background-color: #4c6ef5;
@@ -72,10 +68,12 @@ st.markdown("""
         padding: 10px 20px;
         border-radius: 5px;
         cursor: pointer;
+        min-width: 100px;
     }
     .word-count {
         color: #666;
         font-size: 0.9em;
+        margin-top: 5px;
     }
     .warning-message {
         background-color: #fff3cd;
@@ -84,11 +82,21 @@ st.markdown("""
         border-radius: 5px;
         margin: 10px 0;
     }
+    .title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    .section-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # 页面标题
-st.title("降AIGC率")
+st.markdown('<h1 class="title">降AIGC率</h1>', unsafe_allow_html=True)
 
 # API密钥输入
 api_key = st.text_input("请输入您的DeepSeek API密钥", 
@@ -99,70 +107,75 @@ api_key = st.text_input("请输入您的DeepSeek API密钥",
 if api_key != st.session_state.api_key:
     st.session_state.api_key = api_key
 
-# 文件上传
-uploaded_file = st.file_uploader("上传Word文档", type=["docx"], 
-                                help="仅支持.docx格式的Word文档")
-
-if uploaded_file is not None:
-    if process_docx_upload(uploaded_file):
-        st.success(f"成功加载文档: {uploaded_file.name}")
-
 # 左右两栏布局
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 原文")
-    if st.session_state.paragraphs:
-        selected_para_index = st.selectbox(
-            "选择要编辑的段落", 
-            options=list(range(len(st.session_state.paragraphs))),
-            format_func=lambda x: f"段落 {x+1}"
-        )
-        
-        # 显示原文
-        st.markdown('<div class="text-card">', unsafe_allow_html=True)
-        st.write(st.session_state.paragraphs[selected_para_index])
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # 显示字数
-        word_count = len(st.session_state.paragraphs[selected_para_index])
-        st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">文档上传与编辑区</div>', unsafe_allow_html=True)
+    
+    # 文本输入区
+    input_text = st.text_area("", 
+                             value=st.session_state.input_text,
+                             height=300,
+                             placeholder="在此输入需要优化的文本...")
+    
+    if input_text != st.session_state.input_text:
+        st.session_state.input_text = input_text
+    
+    # 显示字数
+    word_count = len(input_text)
+    st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
 
 with col2:
-    st.markdown("### 优化后的文本")
-    if st.session_state.paragraphs:
-        # 显示优化后的文本
-        st.markdown('<div class="text-card">', unsafe_allow_html=True)
-        if selected_para_index < len(st.session_state.modified_paragraphs):
-            st.write(st.session_state.modified_paragraphs[selected_para_index])
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# 按钮区域
-if st.session_state.paragraphs:
-    st.markdown('<div class="button-container">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">文本对比与导出区</div>', unsafe_allow_html=True)
     
-    # 重置按钮
-    if st.button("重置", key="reset"):
-        st.session_state.modified_paragraphs[selected_para_index] = st.session_state.paragraphs[selected_para_index]
-        st.experimental_rerun()
-    
-    # 一键生成按钮
-    if st.button("一键生成", key="generate"):
-        if not st.session_state.api_key:
-            st.error("请输入DeepSeek API密钥")
-        else:
-            with st.spinner("正在优化文本..."):
-                text = st.session_state.paragraphs[selected_para_index]
-                # 获取当前段落的AI概率
-                ai_prob = st.session_state.ai_probabilities[selected_para_index]
-                optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key, ai_prob)
-                st.session_state.modified_paragraphs[selected_para_index] = optimized_text
-                st.experimental_rerun()
-    
+    # 显示优化后的文本
+    st.markdown('<div class="text-card">', unsafe_allow_html=True)
+    st.write(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...")
     st.markdown('</div>', unsafe_allow_html=True)
 
+# 按钮区域
+st.markdown('<div class="button-container">', unsafe_allow_html=True)
+
+# 重置按钮
+if st.button("重置", key="reset", use_container_width=False):
+    st.session_state.output_text = ""
+    st.experimental_rerun()
+
+# 一键生成按钮
+if st.button("一键生成", key="generate", use_container_width=False):
+    if not st.session_state.api_key:
+        st.error("请输入DeepSeek API密钥")
+    elif not st.session_state.input_text:
+        st.error("请输入需要优化的文本")
+    else:
+        with st.spinner("正在优化文本..."):
+            optimized_text = analyze_text_with_deepseek(st.session_state.input_text, st.session_state.api_key)
+            st.session_state.output_text = optimized_text
+            st.experimental_rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 # 温馨提示
-st.markdown('<div class="warning-message">为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。</div>', unsafe_allow_html=True)
+st.warning("为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。")
+
+# 页脚
+st.markdown("---")
+st.markdown("🎯 **AIGC文本降重修改工具** - 让AI生成文本更接近人类写作，轻松通过检测工具！")
+st.markdown("""
+- 🔴 **红色 (>70% AI概率)**: 需要深度改写
+- 🟠 **橙色 (60%-70%)**: 适度优化
+- 🟣 **紫色 (50%-60%)**: 轻微调整
+- ⚫ **黑色 (<50%)**: 保留原文
+""")
+
+st.markdown("""
+#### 降重核心策略:
+- 📝 **物理删除法**: 识别并删除高风险非核心内容
+- 📚 **引用大法**: 添加学术引用，降低AI检测风险
+- 📋 **分段法**: 将长段落分割，避免"连坐"效应
+- 🔄 **同义词替换**: 用口语化表达替代机器化语言
+""")
 
 # DeepSeek API 调用函数
 def analyze_text_with_deepseek(text, api_key, ai_probability=50):
@@ -471,21 +484,3 @@ def get_download_link(doc_bytes, filename="modified_document.docx"):
     b64 = base64.b64encode(doc_bytes.read()).decode()
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}">点击下载修改后的文档</a>'
     return href
-
-# 页脚
-st.markdown("---")
-st.markdown("#### 🎯 **AIGC文本降重修改工具** - 让AI生成文本更接近人类写作，轻松通过检测工具！")
-st.markdown("""
-- 🔴 **红色 (>70% AI概率)**: 需要深度改写
-- 🟠 **橙色 (60%-70%)**: 适度优化
-- 🟣 **紫色 (50%-60%)**: 轻微调整
-- ⚫ **黑色 (<50%)**: 保留原文
-""") 
-
-st.markdown("""
-#### 降重核心策略:
-- 📝 **物理删除法**: 识别并删除高风险非核心内容
-- 📚 **引用大法**: 添加学术引用，降低AI检测风险
-- 📋 **分段法**: 将长段落分割，避免"连坐"效应
-- 🔄 **同义词替换**: 用口语化表达替代机器化语言
-""") 
