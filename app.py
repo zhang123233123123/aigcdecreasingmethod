@@ -12,7 +12,7 @@ import requests
 
 # 页面配置
 st.set_page_config(
-    page_title="AIGC文本降重修改工具",
+    page_title="降AIGC率",
     page_icon="✍️",
     layout="wide"
 )
@@ -39,39 +39,130 @@ st.markdown("""
     }
     .stTextArea textarea {
         min-height: 200px;
-    }
-    .color-red {
-        color: red;
-    }
-    .color-orange {
-        color: orange;
-    }
-    .color-purple {
-        color: purple;
-    }
-    .color-black {
-        color: black;
-    }
-    .color-green {
-        color: green;
-    }
-    .doc-viewer {
-        border: 1px solid #ddd;
-        padding: 10px;
-        height: 600px;
-        overflow-y: auto;
         background-color: white;
-        color: black;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        padding: 15px;
     }
-    .doc-viewer p {
+    .text-card {
+        background-color: white;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin: 10px 0;
+        min-height: 200px;
+    }
+    .button-container {
+        display: flex;
+        gap: 10px;
+        margin: 10px 0;
+    }
+    .reset-button {
+        background-color: #f0f2f6;
         color: black;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .generate-button {
+        background-color: #4c6ef5;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .word-count {
+        color: #666;
+        font-size: 0.9em;
+    }
+    .warning-message {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # 页面标题
-st.title("AIGC 文本降重修改工具")
-st.markdown("基于 **DeepSeek AI** 分析文本的 **AIGC生成概率**，自动优化内容，降低AI检测风险")
+st.title("降AIGC率")
+
+# API密钥输入
+api_key = st.text_input("请输入您的DeepSeek API密钥", 
+                        value=st.session_state.api_key,
+                        type="password",
+                        help="需要DeepSeek API密钥才能分析和优化文本")
+
+if api_key != st.session_state.api_key:
+    st.session_state.api_key = api_key
+
+# 文件上传
+uploaded_file = st.file_uploader("上传Word文档", type=["docx"], 
+                                help="仅支持.docx格式的Word文档")
+
+if uploaded_file is not None:
+    if process_docx_upload(uploaded_file):
+        st.success(f"成功加载文档: {uploaded_file.name}")
+
+# 左右两栏布局
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 原文")
+    if st.session_state.paragraphs:
+        selected_para_index = st.selectbox(
+            "选择要编辑的段落", 
+            options=list(range(len(st.session_state.paragraphs))),
+            format_func=lambda x: f"段落 {x+1}"
+        )
+        
+        # 显示原文
+        st.markdown('<div class="text-card">', unsafe_allow_html=True)
+        st.write(st.session_state.paragraphs[selected_para_index])
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # 显示字数
+        word_count = len(st.session_state.paragraphs[selected_para_index])
+        st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
+
+with col2:
+    st.markdown("### 优化后的文本")
+    if st.session_state.paragraphs:
+        # 显示优化后的文本
+        st.markdown('<div class="text-card">', unsafe_allow_html=True)
+        if selected_para_index < len(st.session_state.modified_paragraphs):
+            st.write(st.session_state.modified_paragraphs[selected_para_index])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# 按钮区域
+if st.session_state.paragraphs:
+    st.markdown('<div class="button-container">', unsafe_allow_html=True)
+    
+    # 重置按钮
+    if st.button("重置", key="reset"):
+        st.session_state.modified_paragraphs[selected_para_index] = st.session_state.paragraphs[selected_para_index]
+        st.experimental_rerun()
+    
+    # 一键生成按钮
+    if st.button("一键生成", key="generate"):
+        if not st.session_state.api_key:
+            st.error("请输入DeepSeek API密钥")
+        else:
+            with st.spinner("正在优化文本..."):
+                text = st.session_state.paragraphs[selected_para_index]
+                # 获取当前段落的AI概率
+                ai_prob = st.session_state.ai_probabilities[selected_para_index]
+                optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key, ai_prob)
+                st.session_state.modified_paragraphs[selected_para_index] = optimized_text
+                st.experimental_rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# 温馨提示
+st.markdown('<div class="warning-message">为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。</div>', unsafe_allow_html=True)
 
 # DeepSeek API 调用函数
 def analyze_text_with_deepseek(text, api_key, ai_probability=50):
@@ -380,169 +471,6 @@ def get_download_link(doc_bytes, filename="modified_document.docx"):
     b64 = base64.b64encode(doc_bytes.read()).decode()
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}">点击下载修改后的文档</a>'
     return href
-
-# 主界面
-col1, col2 = st.columns(2)
-
-# 左侧面板 - 上传和文档查看
-with col1:
-    st.subheader("文档上传与编辑区")
-    
-    # API密钥输入
-    api_key = st.text_input("请输入您的DeepSeek API密钥", 
-                            value=st.session_state.api_key,
-                            type="password",
-                            help="需要DeepSeek API密钥才能分析和优化文本")
-    
-    if api_key != st.session_state.api_key:
-        st.session_state.api_key = api_key
-    
-    # 文件上传
-    uploaded_file = st.file_uploader("上传Word文档", type=["docx"], 
-                                    help="仅支持.docx格式的Word文档")
-    
-    if uploaded_file is not None:
-        if process_docx_upload(uploaded_file):
-            st.success(f"成功加载文档: {uploaded_file.name}")
-    
-    # 显示可编辑的文档内容
-    if st.session_state.paragraphs:
-        st.markdown("### 文档内容 (点击段落进行编辑)")
-        
-        selected_para_index = st.selectbox(
-            "选择要编辑的段落", 
-            options=list(range(len(st.session_state.paragraphs))),
-            format_func=lambda x: f"段落 {x+1}: {st.session_state.paragraphs[x][:50]}..."
-        )
-        
-        # 显示选定段落的AI概率和颜色标记
-        prob = st.session_state.ai_probabilities[selected_para_index]
-        color_class = get_color_class(prob)
-        
-        # 手动选择AI生成概率
-        st.markdown("### 手动设置AI生成概率（AI率越高改写程度越大，本AI率是指原文本的AI率")
-        selected_prob = st.slider(
-            "AI生成概率", 
-            min_value=0, 
-            max_value=100, 
-            value=prob,
-            step=5,
-            help="手动设置文本的AI生成概率，用于决定改写程度"
-        )
-        
-        # 更新AI生成概率
-        if selected_prob != prob:
-            st.session_state.ai_probabilities[selected_para_index] = selected_prob
-            prob = selected_prob
-            color_class = get_color_class(prob)
-        
-        st.markdown(f"<p>AI生成概率: <span class='{color_class}'>{prob}%</span></p>", unsafe_allow_html=True)
-        
-        # 编辑区域
-        st.session_state.selected_text = st.text_area(
-            "编辑选定的段落", 
-            value=st.session_state.modified_paragraphs[selected_para_index],
-            height=200
-        )
-        
-        # 更新修改后的段落
-        if st.session_state.selected_text != st.session_state.modified_paragraphs[selected_para_index]:
-            st.session_state.modified_paragraphs[selected_para_index] = st.session_state.selected_text
-        
-        # AI优化按钮
-        if st.button("使用DeepSeek AI优化此段落"):
-            if not st.session_state.api_key:
-                st.error("请输入DeepSeek API密钥")
-            else:
-                with st.spinner("正在优化文本..."):
-                    text = st.session_state.selected_text
-                    # 将用户选择的AI概率值传递给API调用函数
-                    ai_prob = st.session_state.ai_probabilities[selected_para_index]
-                    optimized_text = analyze_text_with_deepseek(text, st.session_state.api_key, ai_prob)
-                    
-                    # 显示优化结果
-                    st.markdown("### 优化结果")
-                    st.markdown(f"<p class='color-green'>{optimized_text}</p>", 
-                                unsafe_allow_html=True)
-                    
-                    if st.button("应用AI优化建议"):
-                        st.session_state.modified_paragraphs[selected_para_index] = optimized_text
-                        st.session_state.selected_text = optimized_text
-                        st.experimental_rerun()
-
-# 右侧面板 - 修改前后对比
-with col2:
-    st.subheader("文本对比与导出区")
-    
-    if st.session_state.paragraphs:
-        # 创建两列以便并排显示
-        orig_col, mod_col = st.columns(2)
-        
-        with orig_col:
-            st.markdown("### 原始文本")
-            
-            # 原始文本显示区域，保留原格式
-            original_text_html = "<div class='doc-viewer'>"
-            for idx, para in enumerate(st.session_state.paragraphs):
-                # 获取段落原始样式
-                para_style = get_paragraph_style_html(idx)
-                
-                # 应用原始样式，确保文本为黑色
-                if "color:" not in para_style:
-                    para_style += " color: black;"
-                original_text_html += f"<p style='{para_style}'>{para}</p>"
-            original_text_html += "</div>"
-            
-            st.markdown(original_text_html, unsafe_allow_html=True)
-        
-        with mod_col:
-            st.markdown("### 修改后文本")
-            
-            # 修改后文本显示区域，保留原格式并添加AI概率指示器
-            modified_text_html = "<div class='doc-viewer'>"
-            for idx, para in enumerate(st.session_state.modified_paragraphs):
-                # 获取段落原始样式
-                para_style = get_paragraph_style_html(idx)
-                
-                # 确保文本为黑色
-                if "color:" not in para_style:
-                    para_style += " color: black;"
-                
-                # 获取AI概率的颜色类
-                ai_prob = st.session_state.ai_probabilities[idx]
-                color_class = get_color_class(ai_prob)
-                
-                # 应用原始样式，并添加AI概率指示器
-                modified_text_html += f"<p style='{para_style}'>{para} <span class='{color_class}'>({ai_prob}%)</span></p>"
-            modified_text_html += "</div>"
-            
-            st.markdown(modified_text_html, unsafe_allow_html=True)
-        
-        # 批量处理按钮
-        if st.button("批量分析所有段落"):
-            if not st.session_state.api_key:
-                st.error("请输入DeepSeek API密钥")
-            else:
-                progress_bar = stqdm(enumerate(st.session_state.paragraphs))
-                for idx, para in progress_bar:
-                    progress_bar.set_description(f"正在分析段落 {idx+1}/{len(st.session_state.paragraphs)}")
-                    # 将每个段落的AI概率值传递给API调用函数
-                    ai_prob = st.session_state.ai_probabilities[idx]
-                    optimized_text = analyze_text_with_deepseek(para, st.session_state.api_key, ai_prob)
-                    
-                    # 根据当前设置的AI概率决定是否修改
-                    if ai_prob > 50:
-                        st.session_state.modified_paragraphs[idx] = optimized_text
-                
-                st.success("批量分析完成!")
-                st.experimental_rerun()
-        
-        # 导出按钮
-        if st.button("导出低AIGC文档"):
-            doc_bytes = export_modified_doc()
-            if doc_bytes:
-                st.markdown(get_download_link(doc_bytes), unsafe_allow_html=True)
-                st.success("文档已准备好下载!")
 
 # 页脚
 st.markdown("---")
