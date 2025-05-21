@@ -1,6 +1,14 @@
 import streamlit as st
 import requests
 
+# 尝试导入pyperclip，如果不存在则使用替代方法
+try:
+    import pyperclip
+    has_pyperclip = True
+except ImportError:
+    has_pyperclip = False
+    st.warning("提示：安装pyperclip库可以启用复制功能。可以使用命令 `pip install pyperclip` 安装。")
+
 # 页面配置
 st.set_page_config(page_title="降AIGC率", page_icon="✍️", layout="wide")
 
@@ -57,7 +65,9 @@ def analyze_text_with_deepseek(text, api_key):
         * Beef Up the Background and Literature Review:
         * Make sure the literature review is really thorough and up-to-date. Like how the better version looked at sources all the way up to 2024-2025 and discussed more recent publication trends.
 
-        Please rewrite the provided text following these guidelines to make it sound more natural and human-written while preserving all academic content and meaning.
+        Please rewrite the provided text following these guidelines to make it sound more natural and human-written while preserving all academic content and meaning. 
+        
+        IMPORTANT: If the input text is in Chinese, respond in Chinese as well. Maintain the same language as the input.
         """
         
         payload = {
@@ -84,10 +94,10 @@ def analyze_text_with_deepseek(text, api_key):
             if hasattr(response, 'text'):
                 error_msg += f", 响应: {response.text}"
             st.error(error_msg)
-            return text
+            return None
     except Exception as e:
         st.error(f"调用DeepSeek API时发生错误: {str(e)}")
-        return text
+        return None
 
 # 自定义样式
 st.markdown("""
@@ -111,6 +121,7 @@ st.markdown("""
         margin: 10px 0;
         min-height: 200px;
         color: black !important;
+        overflow-y: auto;
     }
     .word-count {
         color: #999;
@@ -130,8 +141,31 @@ st.markdown("""
         font-weight: bold;
         margin-bottom: 15px;
     }
-    div.text-card p {
+    .output-text {
+        white-space: pre-wrap;
+        font-size: 16px;
+        line-height: 1.6;
         color: black !important;
+    }
+    div[data-testid="stText"] p {
+        color: black !important;
+    }
+    .copy-btn {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+        float: right;
+    }
+    .copy-btn:hover {
+        background-color: #45a049;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -146,7 +180,7 @@ api_key = st.text_input("请输入您的DeepSeek API密钥", type="password")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("文档上传与编辑区")
+    st.subheader("文本输入区")
     
     # 文本输入区
     input_text = st.text_area("", 
@@ -162,12 +196,20 @@ with col1:
     st.text(f"{word_count}/1000 字符")
 
 with col2:
-    st.subheader("文本对比与导出区")
+    st.subheader("优化结果区")
     
     # 显示优化后的文本
     st.markdown('<div class="text-card">', unsafe_allow_html=True)
-    st.write(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...")
+    if st.session_state.output_text:
+        st.markdown(f'<div class="output-text">{st.session_state.output_text}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="output-text">优化后的文本将显示在这里...</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 添加复制功能（提供可选择的文本区供用户复制）
+    if st.session_state.output_text:
+        st.write("👇 点击下方文本框，按Ctrl+A全选后再Ctrl+C复制")
+        st.text_area("", value=st.session_state.output_text, height=100, label_visibility="collapsed")
 
 # 按钮区域
 col1, col2 = st.columns([1, 1])
@@ -177,7 +219,7 @@ with col1:
         st.session_state.output_text = ""
 
 with col2:
-    if st.button("一键生成", key="generate", use_container_width=True):
+    if st.button("一键优化", key="generate", use_container_width=True):
         if not api_key:
             st.error("请输入DeepSeek API密钥")
         elif not input_text:
@@ -189,4 +231,4 @@ with col2:
                     st.session_state.output_text = optimized_text
 
 # 温馨提示
-st.warning("为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。")
+st.warning("为保护您的内容安全，优化后的文本不会保存，请及时复制到您的文件中。")
