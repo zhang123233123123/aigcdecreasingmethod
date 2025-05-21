@@ -1,6 +1,15 @@
 import streamlit as st
 import requests
 
+# 页面配置
+st.set_page_config(page_title="降AIGC率", page_icon="✍️", layout="wide")
+
+# 初始化会话状态
+if 'input_text' not in st.session_state:
+    st.session_state.input_text = ""
+if 'output_text' not in st.session_state:
+    st.session_state.output_text = ""
+
 # DeepSeek API 调用函数
 def analyze_text_with_deepseek(text, api_key):
     """使用DeepSeek API分析文本并提供优化建议"""
@@ -76,31 +85,13 @@ def analyze_text_with_deepseek(text, api_key):
                 error_msg += f", 响应: {response.text}"
             st.error(error_msg)
             return text
-            
     except Exception as e:
         st.error(f"调用DeepSeek API时发生错误: {str(e)}")
-        return text  # 出错时返回原文本
-
-# 页面配置
-st.set_page_config(
-    page_title="降AIGC率",
-    page_icon="✍️",
-    layout="wide"
-)
-
-# 初始化会话状态
-if 'input_text' not in st.session_state:
-    st.session_state.input_text = ""
-if 'output_text' not in st.session_state:
-    st.session_state.output_text = ""
+        return text
 
 # 自定义样式
 st.markdown("""
 <style>
-    body {
-        color: black;
-        background-color: #121212;
-    }
     .main {
         color: black !important;
     }
@@ -111,7 +102,6 @@ st.markdown("""
         border: 1px solid #ddd !important;
         padding: 15px !important;
         color: black !important;
-        font-size: 16px !important;
     }
     .text-card {
         background-color: white;
@@ -121,27 +111,6 @@ st.markdown("""
         margin: 10px 0;
         min-height: 200px;
         color: black !important;
-    }
-    .button-container {
-        display: flex;
-        gap: 10px;
-        margin: 20px 0;
-    }
-    .stButton > button {
-        border-radius: 5px;
-        padding: 10px 20px;
-        font-size: 16px;
-        width: 100%;
-    }
-    .stButton > button:first-child {
-        background-color: white;
-        color: black;
-        border: 1px solid #ddd;
-    }
-    .stButton > button:last-child {
-        background-color: #4c6ef5;
-        color: white;
-        border: none;
     }
     .word-count {
         color: #999;
@@ -161,25 +130,6 @@ st.markdown("""
         font-weight: bold;
         margin-bottom: 15px;
     }
-    .stAlert {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 15px;
-        border-radius: 10px;
-        margin: 20px 0;
-    }
-    div[data-testid="stText"] {
-        color: black !important;
-    }
-    p {
-        color: black !important;
-    }
-    div.stMarkdown p {
-        color: white !important;
-    }
-    .word-count {
-        color: #999 !important;
-    }
     div.text-card p {
         color: black !important;
     }
@@ -187,18 +137,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 页面标题
-st.markdown('<h1 class="title">降AIGC率</h1>', unsafe_allow_html=True)
+st.title("降AIGC率")
 
 # API密钥输入
-api_key = st.text_input("请输入您的DeepSeek API密钥", 
-                        type="password",
-                        help="需要DeepSeek API密钥才能分析和优化文本")
+api_key = st.text_input("请输入您的DeepSeek API密钥", type="password")
 
 # 左右两栏布局
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown('<div class="section-title">文档上传与编辑区</div>', unsafe_allow_html=True)
+    st.subheader("文档上传与编辑区")
     
     # 文本输入区
     input_text = st.text_area("", 
@@ -211,14 +159,14 @@ with col1:
     
     # 显示字数
     word_count = len(input_text)
-    st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
+    st.text(f"{word_count}/1000 字符")
 
 with col2:
-    st.markdown('<div class="section-title">文本对比与导出区</div>', unsafe_allow_html=True)
+    st.subheader("文本对比与导出区")
     
     # 显示优化后的文本
     st.markdown('<div class="text-card">', unsafe_allow_html=True)
-    st.markdown(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...", unsafe_allow_html=False)
+    st.write(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # 按钮区域
@@ -237,7 +185,8 @@ with col2:
         else:
             with st.spinner("正在优化文本..."):
                 optimized_text = analyze_text_with_deepseek(input_text, api_key)
-                st.session_state.output_text = optimized_text
+                if optimized_text:
+                    st.session_state.output_text = optimized_text
 
 # 温馨提示
 st.warning("为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。")
