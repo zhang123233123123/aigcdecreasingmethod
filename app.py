@@ -1,181 +1,13 @@
 import streamlit as st
 import io
+import requests
 import tempfile
 import os
 from docx import Document
-from openai import OpenAI
 import base64
 import re
 import json
 from stqdm import stqdm
-import requests
-
-# 页面配置
-st.set_page_config(
-    page_title="降AIGC率",
-    page_icon="✍️",
-    layout="wide"
-)
-
-# 初始化会话状态
-if 'input_text' not in st.session_state:
-    st.session_state.input_text = ""
-if 'output_text' not in st.session_state:
-    st.session_state.output_text = ""
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = ""
-
-# 自定义样式
-st.markdown("""
-<style>
-    .main {
-        padding: 1rem;
-    }
-    .stTextArea textarea {
-        min-height: 200px;
-        background-color: white;
-        border-radius: 10px;
-        border: 1px solid #ddd;
-        padding: 15px;
-    }
-    .text-card {
-        background-color: white;
-        border-radius: 10px;
-        border: 1px solid #ddd;
-        padding: 15px;
-        margin: 10px 0;
-        min-height: 200px;
-    }
-    .button-container {
-        display: flex;
-        gap: 10px;
-        margin: 10px 0;
-        justify-content: center;
-    }
-    .reset-button {
-        background-color: white;
-        color: black;
-        border: 1px solid #ddd;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        min-width: 100px;
-    }
-    .generate-button {
-        background-color: #4c6ef5;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        min-width: 100px;
-    }
-    .word-count {
-        color: #666;
-        font-size: 0.9em;
-        margin-top: 5px;
-    }
-    .warning-message {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .title {
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 20px;
-    }
-    .section-title {
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# 页面标题
-st.markdown('<h1 class="title">降AIGC率</h1>', unsafe_allow_html=True)
-
-# API密钥输入
-api_key = st.text_input("请输入您的DeepSeek API密钥", 
-                        value=st.session_state.api_key,
-                        type="password",
-                        help="需要DeepSeek API密钥才能分析和优化文本")
-
-if api_key != st.session_state.api_key:
-    st.session_state.api_key = api_key
-
-# 左右两栏布局
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown('<div class="section-title">文档上传与编辑区</div>', unsafe_allow_html=True)
-    
-    # 文本输入区
-    input_text = st.text_area("", 
-                             value=st.session_state.input_text,
-                             height=300,
-                             placeholder="在此输入需要优化的文本...")
-    
-    if input_text != st.session_state.input_text:
-        st.session_state.input_text = input_text
-    
-    # 显示字数
-    word_count = len(input_text)
-    st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
-
-with col2:
-    st.markdown('<div class="section-title">文本对比与导出区</div>', unsafe_allow_html=True)
-    
-    # 显示优化后的文本
-    st.markdown('<div class="text-card">', unsafe_allow_html=True)
-    st.write(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# 按钮区域
-st.markdown('<div class="button-container">', unsafe_allow_html=True)
-
-# 重置按钮
-if st.button("重置", key="reset", use_container_width=False):
-    st.session_state.output_text = ""
-    st.experimental_rerun()
-
-# 一键生成按钮
-if st.button("一键生成", key="generate", use_container_width=False):
-    if not st.session_state.api_key:
-        st.error("请输入DeepSeek API密钥")
-    elif not st.session_state.input_text:
-        st.error("请输入需要优化的文本")
-    else:
-        with st.spinner("正在优化文本..."):
-            optimized_text = analyze_text_with_deepseek(st.session_state.input_text, st.session_state.api_key)
-            st.session_state.output_text = optimized_text
-            st.experimental_rerun()
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# 温馨提示
-st.warning("为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。")
-
-# 页脚
-st.markdown("---")
-st.markdown("🎯 **AIGC文本降重修改工具** - 让AI生成文本更接近人类写作，轻松通过检测工具！")
-st.markdown("""
-- 🔴 **红色 (>70% AI概率)**: 需要深度改写
-- 🟠 **橙色 (60%-70%)**: 适度优化
-- 🟣 **紫色 (50%-60%)**: 轻微调整
-- ⚫ **黑色 (<50%)**: 保留原文
-""")
-
-st.markdown("""
-#### 降重核心策略:
-- 📝 **物理删除法**: 识别并删除高风险非核心内容
-- 📚 **引用大法**: 添加学术引用，降低AI检测风险
-- 📋 **分段法**: 将长段落分割，避免"连坐"效应
-- 🔄 **同义词替换**: 用口语化表达替代机器化语言
-""")
 
 # DeepSeek API 调用函数
 def analyze_text_with_deepseek(text, api_key, ai_probability=50):
@@ -484,3 +316,176 @@ def get_download_link(doc_bytes, filename="modified_document.docx"):
     b64 = base64.b64encode(doc_bytes.read()).decode()
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{b64}" download="{filename}">点击下载修改后的文档</a>'
     return href
+
+# 页面配置
+st.set_page_config(
+    page_title="降AIGC率",
+    page_icon="✍️",
+    layout="wide"
+)
+
+# 初始化会话状态
+if 'input_text' not in st.session_state:
+    st.session_state.input_text = ""
+if 'output_text' not in st.session_state:
+    st.session_state.output_text = ""
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ""
+
+# 自定义样式
+st.markdown("""
+<style>
+    body {
+        color: black;
+        background-color: #121212;
+    }
+    .main {
+        color: black !important;
+    }
+    .stTextArea textarea {
+        min-height: 200px;
+        background-color: white !important;
+        border-radius: 10px !important;
+        border: 1px solid #ddd !important;
+        padding: 15px !important;
+        color: black !important;
+        font-size: 16px !important;
+    }
+    .text-card {
+        background-color: white;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 10px 0;
+        min-height: 200px;
+        color: black !important;
+    }
+    .button-container {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
+    }
+    .stButton > button {
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+        width: 100%;
+    }
+    .stButton > button:first-child {
+        background-color: white;
+        color: black;
+        border: 1px solid #ddd;
+    }
+    .stButton > button:last-child {
+        background-color: #4c6ef5;
+        color: white;
+        border: none;
+    }
+    .word-count {
+        color: #999;
+        font-size: 14px;
+        margin-top: 8px;
+    }
+    .title {
+        color: white;
+        font-size: 32px;
+        font-weight: bold;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    .section-title {
+        color: white;
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    .stAlert {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+    p {
+        color: black !important;
+    }
+    .css-nahz7x {
+        color: black !important;
+    }
+    div[data-testid="stMarkdownContainer"] > p {
+        color: white !important;
+    }
+    .css-184tjsw p {
+        color: white !important;
+    }
+    
+    /* 显示字数的文本颜色 */
+    div[data-testid="stMarkdownContainer"] > .word-count {
+        color: #999 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 页面标题
+st.markdown('<h1 class="title">降AIGC率</h1>', unsafe_allow_html=True)
+
+# API密钥输入
+api_key = st.text_input("请输入您的DeepSeek API密钥", 
+                        value=st.session_state.api_key,
+                        type="password",
+                        help="需要DeepSeek API密钥才能分析和优化文本")
+
+if api_key != st.session_state.api_key:
+    st.session_state.api_key = api_key
+
+# 左右两栏布局
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown('<div class="section-title">文档上传与编辑区</div>', unsafe_allow_html=True)
+    
+    # 文本输入区
+    input_text = st.text_area("", 
+                             value=st.session_state.input_text,
+                             height=300,
+                             placeholder="在此输入需要优化的文本...")
+    
+    if input_text != st.session_state.input_text:
+        st.session_state.input_text = input_text
+    
+    # 显示字数
+    word_count = len(input_text)
+    st.markdown(f'<p class="word-count">{word_count}/1000 字符</p>', unsafe_allow_html=True)
+
+with col2:
+    st.markdown('<div class="section-title">文本对比与导出区</div>', unsafe_allow_html=True)
+    
+    # 显示优化后的文本
+    st.markdown('<div class="text-card">', unsafe_allow_html=True)
+    st.write(st.session_state.output_text if st.session_state.output_text else "优化后的文本将显示在这里...")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# 按钮区域
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    reset = st.button("重置", key="reset", use_container_width=True)
+    if reset:
+        st.session_state.output_text = ""
+        st.experimental_rerun()
+
+with col2:
+    generate = st.button("一键生成", key="generate", use_container_width=True)
+    if generate:
+        if not st.session_state.api_key:
+            st.error("请输入DeepSeek API密钥")
+        elif not st.session_state.input_text:
+            st.error("请输入需要优化的文本")
+        else:
+            with st.spinner("正在优化文本..."):
+                optimized_text = analyze_text_with_deepseek(st.session_state.input_text, st.session_state.api_key)
+                st.session_state.output_text = optimized_text
+                st.experimental_rerun()
+
+# 温馨提示
+st.warning("为保护用户内容安全，段落处理的结果不会保存，请及时复制到自己的文件中。")
