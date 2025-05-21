@@ -1,6 +1,9 @@
 import streamlit as st
 import requests
 
+# 页面配置 - 必须是第一个Streamlit命令
+st.set_page_config(page_title="降AIGC率", page_icon="✍️", layout="wide")
+
 # 尝试导入pyperclip，如果不存在则使用替代方法
 try:
     import pyperclip
@@ -8,9 +11,6 @@ try:
 except ImportError:
     has_pyperclip = False
     st.warning("提示：安装pyperclip库可以启用复制功能。可以使用命令 `pip install pyperclip` 安装。")
-
-# 页面配置
-st.set_page_config(page_title="降AIGC率", page_icon="✍️", layout="wide")
 
 # 初始化会话状态
 if 'input_text' not in st.session_state:
